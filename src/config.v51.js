@@ -1,5 +1,5 @@
 export const APP_VERSION = "v53.0.2-audited-clean";
-export const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwSOEIId8C7BVTxCYwiJoSG7N7k4OSy1TfZXJyDHSD2AWSJ7NWGboHYIqMtqbqP2ISn4Q/exec";
+export const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzezGcafF5xqDKLFdlpGqG5km5P56rcrcg5rZjdvlKKEqkhITn0i8GID-APIBgdmkG47w/exec";
 export const ENABLE_SERVICE_WORKER = false;
 export const CACHE_TTL = { bootstrap: 5 * 60 * 1000, catalog: 10 * 60 * 1000, stock: 5 * 60 * 1000, orderView: 5 * 60 * 1000, diagnostics: 15 * 1000 };
 export const STORAGE_KEYS = { session: "realstock.v53_0.session", draft: "realstock.v53_0.draft", cachePrefix: "realstock.v53_0.cache.", lang: "realstock.v53_0.lang" };
