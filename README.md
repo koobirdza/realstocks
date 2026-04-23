@@ -1,3 +1,5 @@
+Version: v53.0.2-audited-clean
+
 # RealStock v53 Clean
 
 Compatible with the latest workbook:
