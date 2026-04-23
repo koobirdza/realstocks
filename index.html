@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RealStock • ระบบสต๊อกร้านอาหาร</title>
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="RealStock" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="./src/styles.v52.5.css" />
+
+
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div>
+        <h1 class="title"><span aria-hidden="true">🍲</span> <span id="titleText">RealStock</span></h1>
+        <div class="sub"><span id="subtitleText">ระบบสต๊อกสำหรับใช้งานบนมือถือ</span></div>
+      </div>
+      <div class="row">
+        <button id="langThBtn" class="btn ghost">ไทย</button>
+        <button id="langLoBtn" class="btn ghost">ລາວ</button>
+        <span id="versionLabel" class="badge"></span>
+        <span id="healthBadge" class="badge">กำลังเช็กระบบ...</span>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+    <div id="errorBox" class="error hidden"></div>
+
+    <section id="loginPage" class="login">
+      <div class="card pad">
+        <h2 style="margin-top:0">เข้าสู่ระบบพนักงาน</h2>
+        <input id="employeeName" class="input" placeholder="ชื่อพนักงาน" />
+        <div style="height:12px"></div>
+        <button id="loginBtn" class="btn primary" style="width:100%">เข้าสู่ระบบ</button>
+      </div>
+    </section>
+
+    <section id="appPage" class="hidden">
+      <div class="card pad top-panel-card" style="margin-bottom:12px">
+        <div class="top-panel">
+          <div class="top-panel__user row">
+            <div>👤 <strong id="employeeDisplay"></strong></div>
+            <span id="modeBadge" class="badge">ยังไม่ได้เลือกโหมด</span>
+          </div>
+          <div class="top-panel__logout">
+            <button id="logoutBtn" class="btn">ออกจากระบบ</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid modes" style="margin-bottom:12px">
+        <button class="mode count" data-mode="count">🟢 นับสต๊อก</button>
+        <button class="mode issue" data-mode="issue">🔵 เบิกของ</button>
+        <button class="mode receive" data-mode="receive">🟠 รับของ</button>
+        <button class="mode order" data-mode="order">🟣 สั่งของ</button>
+      </div>
+
+      <div id="adminPanel" class="card pad hidden" style="margin-bottom:12px">
+        <div class="between">
+          <div>
+            <strong>เครื่องมือผู้ดูแลระบบ</strong>
+            <div class="hint">ซ่อนจากหน้าใช้งานปกติ เปิดได้เฉพาะ ?admin=1</div>
+            <div id="diagText" class="hint" style="margin-top:6px"></div>
+          </div>
+          <div class="row">
+            <button id="warmBtn" class="btn">อุ่นแคช</button>
+            <button id="nightlyBtn" class="btn">คำนวณรอบกลางคืน</button>
+            <button id="preflightBtn" class="btn">ตรวจความพร้อม</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card pad" style="margin-bottom:12px">
+        <div class="between">
+          <div>
+            <div id="breadcrumb"><strong>หน้าแรก</strong></div>
+          </div>
+          <div id="cacheStamp" class="hint"></div>
+        </div>
+        <div class="nav-buttons-wrap">
+          <button id="homeBtn" class="btn ghost hidden">หน้าแรก</button>
+          <button id="backBtn" class="btn ghost hidden">ย้อนกลับ</button>
+        </div>
+      </div>
+
+
+      <div id="destinationPanel" class="card pad hidden" style="margin-bottom:12px">
+        <div><strong>ปลายทางการเบิก</strong></div>
+        <div id="destinationButtons" class="row"></div>
+      </div>
+
+      <div id="nodePanel" class="grid nav-grid"></div>
+      <div id="itemPanel" class="hidden"></div>
+    </section>
+  </div>
+  <script src="./pwa-register.js"></script>
+  <script type="module" src="./src/app.v51.js"></script>
+</body>
+</html>
+
