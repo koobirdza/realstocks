@@ -1,4 +1,4 @@
-export const APP_VERSION = "v53.0.1-workbook-th-priority";
+export const APP_VERSION = "v53.0.2-audited-clean";
 export const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwSOEIId8C7BVTxCYwiJoSG7N7k4OSy1TfZXJyDHSD2AWSJ7NWGboHYIqMtqbqP2ISn4Q/exec";
 export const ENABLE_SERVICE_WORKER = false;
 export const CACHE_TTL = { bootstrap: 5 * 60 * 1000, catalog: 10 * 60 * 1000, stock: 5 * 60 * 1000, orderView: 5 * 60 * 1000, diagnostics: 15 * 1000 };

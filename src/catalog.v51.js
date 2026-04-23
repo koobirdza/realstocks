@@ -1,7 +1,7 @@
 const TARGET_ICONS = {
   "ห้องสต๊อก": "📦",
   "ครัว": "🍳",
-  "บาร์น้ำ": "🥤",
+  "บาร์น้ำ": "🍹",
   "หน้าร้าน": "🏪",
   "ห้องเย็น": "🧊",
   "แช่แข็ง": "❄️",
@@ -28,11 +28,11 @@ const SUB_ICONS = {
 
 
 const SYSTEM_LABEL_MAP = {
-  "BAR_STATION": "บาร์",
-  "BAR": "บาร์",
-  "BAR_ROOM": "บาร์",
-  "BAR_STOCK_ROOM": "สต๊อกบาร์",
-  "BAR_STOCK": "สต๊อกบาร์",
+  "BAR_STATION": "บาร์น้ำ",
+  "BAR": "บาร์น้ำ",
+  "BAR_ROOM": "บาร์น้ำ",
+  "BAR_STOCK_ROOM": "สต๊อกบาร์น้ำ",
+  "BAR_STOCK": "สต๊อกบาร์น้ำ",
   "FRONT_STATION": "หน้าร้าน",
   "FRONT": "หน้าร้าน",
   "KITCHEN_BACKROOM": "ครัวหลัง",
