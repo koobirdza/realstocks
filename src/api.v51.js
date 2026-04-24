@@ -7,10 +7,11 @@ export function clearDataCaches() { clearCache("bootstrap."); clearCache("catalo
 export const health = () => getJson("health");
 export const diagnostics = () => getJson("diagnostics", { admin: 1 }, "diag.admin", CACHE_TTL.diagnostics);
 export const preflight = () => getJson("preflight", { admin: 1 });
-export const bootstrapData = () => getJson("bootstrap", {}, "bootstrap.main", CACHE_TTL.bootstrap);
+export const bootstrapData = () => getJson("bootstrapLite", {}, "bootstrap.lite", CACHE_TTL.bootstrap);
 export const getCatalog = (mode) => getJson("catalog", { mode }, `catalog.${mode}`, CACHE_TTL.catalog);
 export const getCurrentStock = () => getJson("currentStock", {}, "stock.current", CACHE_TTL.stock);
 export const getOrderView = () => getJson("orderView", {}, "order.view", CACHE_TTL.orderView);
 export const adminWarm = () => getJson("adminWarm", { admin: 1 });
+export const adminBuildCatalogView = () => getJson("adminBuildCatalogView", { admin: 1 });
 export const adminNightly = () => getJson("adminNightly", { admin: 1 });
 export async function submitAction(action, requestId, rows) { const res = await withTimeout(fetch(GOOGLE_SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action, requestId, rows }) }), SAVE_TIMEOUT_MS, "save timeout"); return await res.json(); }

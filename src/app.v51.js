@@ -3,7 +3,7 @@ import { state, setEmployee, setMode, resetNav } from "./state.v51.js";
 import { restoreSession, persistSession, logoutSession } from "./auth.v51.js";
 import { bindDom, refreshStaticText, renderSession, setHealth, showError, toast, renderAdmin, renderBreadcrumb, renderDestinationPicker, renderNodesFromHtml, renderItems, renderSkeleton, setSaveLocked } from "./ui.v51.js";
 import { t, getLang, setLang } from "./i18n.v51.js";
-import { bootstrapData, health, submitAction, clearDataCaches, adminWarm, adminNightly, diagnostics, preflight } from "./api.v51.js";
+import { bootstrapData, getCatalog, health, submitAction, clearDataCaches, adminWarm, adminNightly, diagnostics, preflight } from "./api.v51.js";
 import { getNodeByPath, needsDestination, warmCatalogMode, getWarmMode } from "./catalog.v51.js";
 import { collectRows } from "./inventory.v51.js";
 import { $, $$, createRequestId, params, debounce } from "./utils.v51.js";
@@ -18,7 +18,26 @@ function attachInputAutosave() { if (state.mode === 'order') return; $$('[data-q
 async function refreshHealth() { try { const res = await health(); state.nightlyCutoffHour = Number(res?.nightlyCutoffHour || 22); setHealth(!!res?.ok, res?.ok ? t('healthReady', { hour: state.nightlyCutoffHour }) : t('healthProblem', { message: res?.message || '' })); } catch (err) { setHealth(false, t('healthFail')); } }
 async function refreshDiagnostics() { if (!state.admin) return; try { const [diag, pf] = await Promise.all([diagnostics().catch(() => null), preflight().catch(() => null)]); const lines = []; if (diag?.ok) lines.push(`รอบคำนวณกลางคืน: ${diag.diagnostics.nightlyRuns || 0} • ล่าสุด: ${diag.diagnostics.lastNightlyAt || '-'}`); if (pf?.ok) lines.push(`สถานะตรวจความพร้อม: ${pf.summary.status}`); state.infoBanner = lines.join(' | ') || 'นับ/เบิก/รับของ = บันทึกลง log อย่างเดียว • สั่งของ = รายงานจากรอบคำนวณกลางคืน'; renderAdmin(); } catch (err) {} }
 function applyWarmMode(mode, rows, cached = false) { const warmed = warmCatalogMode(mode, rows || []); state.catalogRowsByMode[mode] = rows || []; state.treeByMode[mode] = warmed.tree; state.instantReadyModes[mode] = true; if (state.mode === mode) { state.scheduleBadgeByPath = warmed.scheduleBadgeByPath; state.lastCacheStamp = cached ? 'ใช้แคช • อ้างอิงรอบข้อมูลล่าสุด 22:00' : 'พร้อมใช้งาน • โหลดครั้งเดียวแล้วใช้ต่อ'; } }
-async function ensureBootstrapLoaded(force = false) { if (state.bootstrapped && !force) return; const boot = await bootstrapData(); if (!boot?.ok) throw new Error(boot?.message || 'โหลดข้อมูลเริ่มต้นไม่สำเร็จ'); ['count','issue','receive','order'].forEach((mode) => applyWarmMode(mode, boot.catalogs?.[mode] || [], true)); state.stockMap = boot.stock || {}; state.orderRows = boot.orderView || []; state.nightlyCutoffHour = Number(boot.nightlyCutoffHour || 22); state.bootstrapped = true; state.lastCacheStamp = getLang()==='lo' ? 'ພ້ອມໃຊ້ງານ • ໂຫຼດຄັ້ງດຽວແລ້ວໃຊ້ຕໍ່' : 'พร้อมใช้งาน • โหลดครั้งเดียวแล้วใช้ต่อ'; }
+async function ensureBootstrapLoaded(force = false) {
+  if (state.bootstrapped && !force) return;
+  const boot = await bootstrapData();
+  if (!boot?.ok) throw new Error(boot?.message || 'โหลดข้อมูลเริ่มต้นไม่สำเร็จ');
+  state.stockMap = boot.stock || {};
+  state.orderRows = boot.orderView || [];
+  state.nightlyCutoffHour = Number(boot.nightlyCutoffHour || 22);
+  state.bootstrapped = true;
+  state.lastCacheStamp = getLang()==='lo' ? 'ພ້ອມໃຊ້ງານ • ໂຫຼດຂໍ້ມູນເບື້ອງຕົ້ນແລ້ວ' : 'พร้อมใช้งาน • โหลดข้อมูลเบื้องต้นแล้ว';
+}
+
+async function ensureCatalogLoaded(mode, force = false) {
+  if (!mode) return;
+  if (state.instantReadyModes[mode] && !force) return;
+  const payload = await getCatalog(mode);
+  if (!payload?.ok) throw new Error(payload?.message || `โหลดหมวด ${mode} ไม่สำเร็จ`);
+  applyWarmMode(mode, payload.rows || [], payload.cached === true);
+  state.scheduleBadgeByPath = getWarmMode(mode).scheduleBadgeByPath;
+  state.lastCacheStamp = payload.cached ? 'ใช้แคชหมวดล่าสุด' : `โหลดหมวดจาก ${payload.catalogSource || 'backend'} แล้ว`;
+}
 
 function applyLatestCountUpdates(updates = []) {
   if (!Array.isArray(updates) || !updates.length) return;
@@ -32,7 +51,7 @@ function applyLatestCountUpdates(updates = []) {
       nightly_snapshot_date: prev.nightly_snapshot_date || row.latest_count_ts || ''
     };
   });
-  const cached = getCache("bootstrap.main");
+  const cached = getCache("bootstrap.lite");
   if (cached?.value?.ok) {
     const next = { ...cached.value, stock: { ...(cached.value.stock || {}) } };
     updates.forEach((row) => {
@@ -45,7 +64,7 @@ function applyLatestCountUpdates(updates = []) {
         nightly_snapshot_date: prev.nightly_snapshot_date || row.latest_count_ts || ''
       };
     });
-    setCache("bootstrap.main", next, 5 * 60 * 1000);
+    setCache("bootstrap.lite", next, 5 * 60 * 1000);
   }
 }
 
@@ -101,6 +120,7 @@ async function chooseMode(mode) {
   render();
   renderSkeleton();
   await ensureBootstrapLoaded();
+  await ensureCatalogLoaded(mode);
   state.scheduleBadgeByPath = getWarmMode(mode).scheduleBadgeByPath;
   render();
 }
@@ -215,7 +235,12 @@ function bindEvents() {
 
   $('warmBtn')?.addEventListener('click', async () => {
     const res = await adminWarm();
-    toast(res?.ok ? t('warmOk') : t('warmFail'), res?.ok ? 'success' : 'error');
+    toast(res?.ok ? 'สร้าง Catalog_View และ warm cache สำเร็จ' : t('warmFail'), res?.ok ? 'success' : 'error');
+    if (res?.ok) {
+      clearDataCaches();
+      state.bootstrapped = false;
+      if (state.mode) await ensureCatalogLoaded(state.mode, true);
+    }
     refreshDiagnostics();
   });
 
@@ -226,6 +251,7 @@ function bindEvents() {
       clearDataCaches();
       state.bootstrapped = false;
       await ensureBootstrapLoaded(true);
+      if (state.mode) await ensureCatalogLoaded(state.mode, true);
       render();
     }
     refreshDiagnostics();
