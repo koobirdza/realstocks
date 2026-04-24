@@ -86,6 +86,12 @@ function render() {
 
   renderItems(node, state.stockMap, state.orderRows, handleSave);
   attachInputAutosave();
+  const receiveDateInput = $('receiveDateInput');
+  if (receiveDateInput) {
+    state.receiveDate = receiveDateInput.value || new Date().toISOString().slice(0,10);
+    receiveDateInput.addEventListener('change', () => { state.receiveDate = receiveDateInput.value || new Date().toISOString().slice(0,10); });
+    receiveDateInput.addEventListener('input', () => { state.receiveDate = receiveDateInput.value || new Date().toISOString().slice(0,10); });
+  }
   setSaveLocked(state.saveInFlight);
 }
 
@@ -109,7 +115,7 @@ async function handleSave() {
       throw new Error(t('selectDestination'));
     }
 
-    const rows = collectRows(node, readInputValues());
+    const rows = collectRows(node, readInputValues(), { businessDate: state.mode === 'receive' ? (($('receiveDateInput')?.value || state.receiveDate || new Date().toISOString().slice(0,10))) : '' });
     const requestId = createRequestId();
 
     state.saveInFlight = true;

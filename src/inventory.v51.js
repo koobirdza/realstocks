@@ -34,11 +34,12 @@ function destinationLabel(destKey = "") {
   return found?.label || destKey || "";
 }
 
-export function collectRows(node, values) {
+export function collectRows(node, values, options = {}) {
   if (!state.employee) throw new Error("ยังไม่ได้เข้าสู่ระบบ");
   if (!state.mode) throw new Error("ยังไม่ได้เลือกโหมด");
   const items = getItems(node);
   if (state.mode === "issue" && !state.destination) throw new Error("กรุณาเลือกปลายทางการเบิกก่อนบันทึก");
+  const businessDate = state.mode === "receive" && options.businessDate ? String(options.businessDate).slice(0,10) : todayIso();
   const rows = values
     .filter((x) => x.value !== "")
     .map((x) => {
@@ -50,7 +51,8 @@ export function collectRows(node, values) {
       return {
         tx_id: createRequestId(),
         timestamp: nowIso(),
-        date: todayIso(),
+        date: businessDate,
+        business_date: businessDate,
         employee: state.employee,
         item_key: item.item_key,
         item_name: item.item_name,
