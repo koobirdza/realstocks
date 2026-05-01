@@ -1,5 +1,1 @@
-(() => {
-  if (!('serviceWorker' in navigator)) return;
-  // Intentionally no-op by default.
-  // App-level registration is already controlled inside src/app.v51.js
-})();
+// RealStock v53.9.0: Service worker registration is controlled by src/app.v53.9.js
