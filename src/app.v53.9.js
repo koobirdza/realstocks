@@ -1,4 +1,4 @@
-import { ENABLE_SERVICE_WORKER } from "./config.v53.9.js";
+import { ENABLE_SERVICE_WORKER, ENABLE_IDLE_PRELOAD } from "./config.v53.9.js";
 import { state, setEmployee, setMode, resetNav } from "./state.v53.9.js";
 import { restoreSession, persistSession, logoutSession } from "./auth.v53.9.js";
 import { bindDom, refreshStaticText, renderSession, setHealth, showError, toast, renderAdmin, renderBreadcrumb, renderDestinationPicker, renderNodesFromHtml, renderItems, renderSkeleton, setSaveLocked } from "./ui.v53.9.js";
@@ -37,6 +37,21 @@ async function ensureCatalogLoaded(mode, force = false) {
   applyWarmMode(mode, payload.rows || [], payload.cached === true);
   state.scheduleBadgeByPath = getWarmMode(mode).scheduleBadgeByPath;
   state.lastCacheStamp = payload.cached ? 'ใช้แคชหมวดล่าสุด' : `โหลดหมวดจาก ${payload.catalogSource || 'backend'} แล้ว`;
+}
+
+function preloadOtherCatalogModes(activeMode) {
+  if (!ENABLE_IDLE_PRELOAD) return;
+  const modes = ["count", "issue", "receive", "order"].filter((mode) => mode !== activeMode && !state.instantReadyModes[mode]);
+  const runner = async () => {
+    for (const mode of modes) {
+      try {
+        const payload = await getCatalog(mode);
+        if (payload?.ok) applyWarmMode(mode, payload.rows || [], payload.cached === true);
+      } catch (err) {}
+    }
+  };
+  if ("requestIdleCallback" in window) window.requestIdleCallback(() => runner(), { timeout: 2500 });
+  else setTimeout(runner, 500);
 }
 
 function applyLatestCountUpdates(updates = []) {
@@ -121,6 +136,7 @@ async function chooseMode(mode) {
   renderSkeleton();
   await ensureBootstrapLoaded();
   await ensureCatalogLoaded(mode);
+  preloadOtherCatalogModes(mode);
   state.scheduleBadgeByPath = getWarmMode(mode).scheduleBadgeByPath;
   render();
 }

@@ -315,79 +315,28 @@ button,input,select{font:inherit}
   .item-panel-list .step{height:30px;min-height:30px;font-size:16px;width:30px}
   .footer-bar .btn{font-size:15px}
 }
-/* ========================================
-   GLOBAL FONT SCALE (v53.9 mobile readability)
-======================================== */
-
-/* base desktop */
-html {
-  font-size: 17px; /* เดิม ~16 → เพิ่มนิดเดียว */
-}
-
-body {
-  font-size: 1.05rem;
-  line-height: 1.45;
-}
 
 /* ========================================
-   MOBILE BOOST (สำคัญมาก)
+   v53.10 Performance + mobile readability patch
 ======================================== */
+html{font-size:17px}
+body{font-size:1.05rem;line-height:1.45}
+.load-more-wrap{display:flex;justify-content:center;padding:12px 0 4px}
+.load-more-wrap .btn{min-width:220px;font-weight:800}
 @media (max-width:640px){
-
-  body {
-    font-size: 1.08rem;
-  }
-
-  .title, .page-title {
-    font-size: 18px !important;
-  }
-
-  .nav-title {
-    font-size: 19px !important;
-  }
-
-  .item-title,
-  .item-brand {
-    font-size: 19px !important;
-  }
-
-  .item-meta-primary {
-    font-size: 13px !important;
-  }
-
-  .item-meta-secondary {
-    font-size: 11px !important;
-  }
-
-  .btn,
-  .action-btn {
-    font-size: 14px;
-  }
-
-  .mode {
-    font-size: 18px;
-  }
-
-  .qty {
-    font-size: 16px !important;
-  }
+  body{font-size:1.08rem}
+  .title,.page-title{font-size:18px!important}
+  .nav-title{font-size:19px!important}
+  .item-title,.item-brand{font-size:19px!important}
+  .item-meta-primary{font-size:13px!important}
+  .item-meta-secondary{font-size:11px!important}
+  .btn,.action-btn{font-size:14px}
+  .mode{font-size:18px}
+  .qty{font-size:16px!important}
+  .load-more-wrap .btn{width:100%;min-height:42px}
 }
-
-/* ========================================
-   SMALL PHONE BOOST
-======================================== */
 @media (max-width:420px){
-
-  .item-title,
-  .item-brand {
-    font-size: 18px !important;
-  }
-
-  .nav-title {
-    font-size: 18px !important;
-  }
-
-  .btn {
-    font-size: 13px;
-  }
+  .item-title,.item-brand{font-size:18px!important}
+  .nav-title{font-size:18px!important}
+  .btn{font-size:13px}
 }

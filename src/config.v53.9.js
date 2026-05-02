@@ -1,10 +1,10 @@
-export const APP_VERSION = "v53.9.0-frontend-clean";
+export const APP_VERSION = "v53.10.0-performance-stable";
 
 // GitHub Pages setup:
 // 1) เปิด URL แบบนี้ครั้งแรก: https://<your-github-page>/RealStock/?api=<REALSTOCK_WEB_APP_URL>
 // 2) ระบบจะจำ API URL ไว้ใน localStorage
 // 3) หรือแก้ DEFAULT_GOOGLE_SCRIPT_URL ด้านล่างเป็น Web App URL ของ RealStock โดยตรง
-const DEFAULT_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzezGcafF5xqDKLFdlpGqG5km5P56rcrcg5rZjdvlKKEqkhITn0i8GID-APIBgdmkG47w/exec";
+const DEFAULT_GOOGLE_SCRIPT_URL = "";
 const params = new URLSearchParams(window.location.search);
 const apiFromQuery = params.get("api") || "";
 if (apiFromQuery) localStorage.setItem("realstock.apiUrl", apiFromQuery);
@@ -12,7 +12,7 @@ export const GOOGLE_SCRIPT_URL = apiFromQuery || localStorage.getItem("realstock
 
 export const ENABLE_SERVICE_WORKER = false;
 export const CACHE_TTL = { bootstrap: 5 * 60 * 1000, catalog: 10 * 60 * 1000, stock: 5 * 60 * 1000, orderView: 5 * 60 * 1000, diagnostics: 15 * 1000 };
-export const STORAGE_KEYS = { session: "realstock.v53_9.session", draft: "realstock.v53_9.draft", cachePrefix: "realstock.v53_9.cache.", lang: "realstock.v53_9.lang" };
+export const STORAGE_KEYS = { session: "realstock.v53_10.session", draft: "realstock.v53_10.draft", cachePrefix: "realstock.v53_10.cache.", lang: "realstock.v53_10.lang" };
 
 // usage_zones ถูกถอดออกแล้ว: issue ไม่ต้องเลือก usage destination
 export const ISSUE_DESTINATIONS = [];
@@ -27,3 +27,8 @@ export const SAVE_TIMEOUT_MS = 12000;
 export const MAX_QTY = 999999;
 export const ENABLE_CONVERSION_QTY = true;
 export const ENABLE_COUNT_ISSUE_CONVERSION = true;
+
+// Performance: render long item lists progressively on mobile.
+export const MAX_RENDER_ITEMS_INITIAL = 80;
+export const MAX_RENDER_ITEMS_STEP = 80;
+export const ENABLE_IDLE_PRELOAD = true;

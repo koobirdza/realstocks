@@ -1,4 +1,4 @@
-import { MODE_META, ISSUE_DESTINATIONS, APP_VERSION } from "./config.v53.9.js";
+import { MODE_META, ISSUE_DESTINATIONS, APP_VERSION, MAX_RENDER_ITEMS_INITIAL, MAX_RENDER_ITEMS_STEP } from "./config.v53.9.js";
 import { state } from "./state.v53.9.js";
 import { $, $$, escapeHtml } from "./utils.v53.9.js";
 import { getItems, pathLabels, needsDestination, getChildren } from "./catalog.v53.9.js";
@@ -290,19 +290,52 @@ function itemMetaModel(mode, item, stock, order) {
   };
 }
 export function renderItems(node, stockMap = {}, orderRows = [], onSave) {
-  let items = getItems(node); dom.nodePanel.classList.add("hidden"); dom.itemPanel.classList.remove("hidden"); const meta = MODE_META[state.mode];
+  const allItems = getItems(node);
   const orderMap = Object.fromEntries(orderRows.map((x) => [x.item_key, x]));
+  let items = allItems;
   if (state.mode === 'order') items = items.filter((item) => Number(orderMap[item.item_key]?.suggested_order_qty || 0) > 0);
-  if (!items.length) { dom.itemPanel.innerHTML = `<div class="card pad">${state.mode === 'order' ? t('orderEmpty') : t('noItems')}</div>`; return; }
+
+  dom.nodePanel.classList.add("hidden");
+  dom.itemPanel.classList.remove("hidden");
+  const meta = MODE_META[state.mode];
+
+  if (!items.length) {
+    dom.itemPanel.innerHTML = `<div class="card pad">${state.mode === 'order' ? t('orderEmpty') : t('noItems')}</div>`;
+    return;
+  }
+
   dom.itemPanel.classList.toggle('item-panel-list', state.mode !== 'order');
   dom.itemPanel.dataset.listMode = state.mode || '';
+
+  const pathKey = [state.mode, ...(state.path || [])].join('>') || state.mode || 'root';
+  const defaultLimit = state.mode === 'order' ? Math.max(MAX_RENDER_ITEMS_INITIAL, 120) : MAX_RENDER_ITEMS_INITIAL;
+  const limit = Math.max(Number(state.visibleLimitByPath?.[pathKey] || defaultLimit), defaultLimit);
+  const visibleItems = items.slice(0, limit);
+  const hasMore = visibleItems.length < items.length;
+
   const qtyPlaceholder = state.mode === 'receive' ? 'รับเข้า' : state.mode === 'issue' ? 'เบิก' : 'นับ';
-  const saveDisabled = '';
   const receiveDateValue = state.receiveDate || new Date().toISOString().slice(0,10);
   const receiveDateHtml = state.mode === 'receive'
     ? `<div class="receive-date-card" style="margin-top:12px;padding:12px;border:1px solid #e5edf5;border-radius:14px;background:#f8fafc"><label for="receiveDateInput" class="hint" style="display:block;margin-bottom:6px">วันที่รับเข้า</label><input id="receiveDateInput" class="input" type="date" value="${escapeHtml(receiveDateValue)}" style="max-width:220px" /><div class="hint" style="margin-top:6px">ค่าเริ่มต้นคือวันนี้ สามารถแก้ย้อนหลังได้ถ้าลงรับของย้อนหลัง</div></div>`
     : '';
-  dom.itemPanel.innerHTML = `<div class="card pad"><div class="list-summary"><div class="between"><div><strong>${escapeHtml(meta.label)}</strong></div><div class="pill">${items.length} รายการ</div></div>${receiveDateHtml}</div><div class="grid">${items.map((item, idx) => { const stock = stockMap[item.item_key] || {}; const order = orderMap[item.item_key] || {}; const suggestion = Number(order.suggested_order_qty || 0); const displayName = buildItemDisplayName(item); const metaModel = itemMetaModel(state.mode, item, stock, order); if (state.mode === 'order') { return `<div class="item order-item"><div class="between" style="margin-bottom:8px;align-items:flex-start"><div class="item-head"><h4 class="item-title"><span class="item-index">${idx + 1}.</span>${escapeHtml(displayName.titleLine)}</h4>${displayName.brandLine ? `<div class="item-brand">${escapeHtml(displayName.brandLine)}</div>` : ''}</div></div><div class="meta">${metaModel.primary}</div><div class="meta">${metaModel.secondary}</div><div class="between" style="margin-top:12px;align-items:flex-end"><div><div class="hint">${escapeHtml(t('suggestedQty'))}</div><div style="font-size:34px;font-weight:800;line-height:1.05">${escapeHtml(suggestion)}</div></div><div class="pill">${escapeHtml(t('useReceive'))}</div></div></div>`; } return `<div class="item item-card-v2" data-item-index="${idx}"><div class="item-main"><div class="item-head"><h4 class="item-title"><span class="item-index">${idx + 1}.</span>${escapeHtml(displayName.titleLine)}</h4>${displayName.brandLine ? `<div class="item-brand">${escapeHtml(displayName.brandLine)}</div>` : ''}</div><div class="item-bottom"><div class="item-meta-block"><div class="item-meta-primary">${metaModel.primary}</div>${metaModel.secondary ? `<div class="item-meta-secondary">${metaModel.secondary}</div>` : ''}</div><div class="item-stepper" aria-label="item quantity controls"><button class="btn step step-minus" data-step="${idx}:-1" aria-label="ลดจำนวน">−</button><input class="input qty" data-qty-index="${idx}" inputmode="decimal" enterkeyhint="next" type="number" min="0" step="any" placeholder="${qtyPlaceholder}" /><button class="btn step step-plus" data-step="${idx}:1" aria-label="เพิ่มจำนวน">+</button></div></div></div></div>`; }).join('')}</div>${state.mode === 'order' ? '' : `<div class="footer-bar"><div class="row"><button id="saveBtn" class="btn primary" ${saveDisabled}>${escapeHtml(meta.saveLabel)}</button></div></div>`}</div>`;
+
+  const rowsHtml = visibleItems.map((item, idx) => {
+    const stock = stockMap[item.item_key] || {};
+    const order = orderMap[item.item_key] || {};
+    const suggestion = Number(order.suggested_order_qty || 0);
+    const displayName = buildItemDisplayName(item);
+    const metaModel = itemMetaModel(state.mode, item, stock, order);
+    if (state.mode === 'order') {
+      return `<div class="item order-item"><div class="between" style="margin-bottom:8px;align-items:flex-start"><div class="item-head"><h4 class="item-title"><span class="item-index">${idx + 1}.</span>${escapeHtml(displayName.titleLine)}</h4>${displayName.brandLine ? `<div class="item-brand">${escapeHtml(displayName.brandLine)}</div>` : ''}</div></div><div class="meta">${metaModel.primary}</div><div class="meta">${metaModel.secondary}</div><div class="between" style="margin-top:12px;align-items:flex-end"><div><div class="hint">${escapeHtml(t('suggestedQty'))}</div><div style="font-size:34px;font-weight:800;line-height:1.05">${escapeHtml(suggestion)}</div></div><div class="pill">${escapeHtml(t('useReceive'))}</div></div></div>`;
+    }
+    return `<div class="item item-card-v2" data-item-index="${idx}"><div class="item-main"><div class="item-head"><h4 class="item-title"><span class="item-index">${idx + 1}.</span>${escapeHtml(displayName.titleLine)}</h4>${displayName.brandLine ? `<div class="item-brand">${escapeHtml(displayName.brandLine)}</div>` : ''}</div><div class="item-bottom"><div class="item-meta-block"><div class="item-meta-primary">${metaModel.primary}</div>${metaModel.secondary ? `<div class="item-meta-secondary">${metaModel.secondary}</div>` : ''}</div><div class="item-stepper" aria-label="item quantity controls"><button class="btn step step-minus" data-step="${idx}:-1" aria-label="ลดจำนวน">−</button><input class="input qty" data-qty-index="${idx}" inputmode="decimal" enterkeyhint="next" type="number" min="0" step="any" placeholder="${qtyPlaceholder}" /><button class="btn step step-plus" data-step="${idx}:1" aria-label="เพิ่มจำนวน">+</button></div></div></div></div>`;
+  }).join('');
+
+  const moreHtml = hasMore
+    ? `<div class="load-more-wrap"><button id="loadMoreItemsBtn" class="btn ghost" type="button">แสดงเพิ่มอีก ${Math.min(MAX_RENDER_ITEMS_STEP, items.length - visibleItems.length)} รายการ (${visibleItems.length}/${items.length})</button></div>`
+    : '';
+
+  dom.itemPanel.innerHTML = `<div class="card pad"><div class="list-summary"><div class="between"><div><strong>${escapeHtml(meta.label)}</strong></div><div class="pill">${visibleItems.length}/${items.length} รายการ</div></div>${receiveDateHtml}</div><div class="grid">${rowsHtml}</div>${moreHtml}${state.mode === 'order' ? '' : `<div class="footer-bar"><div class="row"><button id="saveBtn" class="btn primary">${escapeHtml(meta.saveLabel)}</button></div></div>`}</div>`;
 
   const inputs = Array.from($$('[data-qty-index]', dom.itemPanel));
   const itemCards = Array.from($$('[data-item-index]', dom.itemPanel));
@@ -314,10 +347,21 @@ export function renderItems(node, stockMap = {}, orderRows = [], onSave) {
     const targetCard = itemCards[index];
     if (!targetInput || !targetCard) return;
     if (opts.focus) targetInput.focus({ preventScroll: true });
-    if (opts.select) {
-      try { targetInput.select(); } catch (e) {}
-    }
+    if (opts.select) { try { targetInput.select(); } catch (e) {} }
     if (opts.scroll !== false) targetCard.scrollIntoView({ block: 'center', behavior: opts.behavior || 'smooth' });
+  }
+
+  const loadMoreBtn = $("loadMoreItemsBtn");
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', () => {
+      const currentValues = new Map(inputs.map((input) => [Number(input.dataset.qtyIndex), input.value]));
+      state.visibleLimitByPath[pathKey] = limit + MAX_RENDER_ITEMS_STEP;
+      renderItems(node, stockMap, orderRows, onSave);
+      currentValues.forEach((value, index) => {
+        const input = dom.itemPanel.querySelector(`[data-qty-index="${index}"]`);
+        if (input) input.value = value;
+      });
+    });
   }
 
   $$('[data-step]', dom.itemPanel).forEach((el) => el.addEventListener('click', () => {
@@ -351,7 +395,6 @@ export function renderItems(node, stockMap = {}, orderRows = [], onSave) {
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         if (inputs[idx - 1]) setActive(idx - 1, { focus: true, select: true });
-        return;
       }
     });
     input.addEventListener('blur', () => {
