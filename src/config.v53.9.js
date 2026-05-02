@@ -4,7 +4,7 @@ export const APP_VERSION = "v53.10.2-save-stable";
 // 1) เปิด URL แบบนี้ครั้งแรก: https://<your-github-page>/RealStock/?api=<REALSTOCK_WEB_APP_URL>
 // 2) ระบบจะจำ API URL ไว้ใน localStorage
 // 3) หรือแก้ DEFAULT_GOOGLE_SCRIPT_URL ด้านล่างเป็น Web App URL ของ RealStock โดยตรง
-const DEFAULT_GOOGLE_SCRIPT_URL = "";
+const DEFAULT_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzezGcafF5xqDKLFdlpGqG5km5P56rcrcg5rZjdvlKKEqkhITn0i8GID-APIBgdmkG47w/exec";
 const params = new URLSearchParams(window.location.search);
 const apiFromQuery = params.get("api") || "";
 if (apiFromQuery) localStorage.setItem("realstock.apiUrl", apiFromQuery);
