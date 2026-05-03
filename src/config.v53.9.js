@@ -4,7 +4,7 @@ export const APP_VERSION = "v54.0.0-cloudflare-pwa";
 // 1) เปิด URL แบบนี้ครั้งแรก: https://<your-github-page>/RealStock/?api=<WORKER_REALSTOCK_URL>
 // 2) ระบบจะจำ API URL ไว้ใน localStorage
 // 3) หรือแก้ DEFAULT_GOOGLE_SCRIPT_URL ด้านล่างเป็น Cloudflare Worker URL เช่น https://realstock-api.xxx.workers.dev/realstock
-const DEFAULT_GOOGLE_SCRIPT_URL = "";
+const DEFAULT_GOOGLE_SCRIPT_URL = "https://realstock-api.koobirdza.workers.dev/realstock";
 const params = new URLSearchParams(window.location.search);
 const apiFromQuery = params.get("api") || "";
 if (apiFromQuery) localStorage.setItem("realstock.apiUrl", apiFromQuery);
