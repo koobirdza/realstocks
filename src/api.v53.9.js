@@ -88,7 +88,7 @@ export async function submitAction(action, requestId, rows) {
   };
 
   try {
-    const res = await withTimeout(fetch(GOOGLE_SCRIPT_URL, {
+    const res = await fetch(GOOGLE_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
