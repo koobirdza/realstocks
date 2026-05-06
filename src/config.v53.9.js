@@ -1,10 +1,10 @@
-export const APP_VERSION = "v53.10.2-save-stable";
+export const APP_VERSION = "v54.1.0-queue-stable";
 
-// GitHub Pages setup:
-// 1) เปิด URL แบบนี้ครั้งแรก: https://<your-github-page>/RealStock/?api=<REALSTOCK_WEB_APP_URL>
+// GitHub Pages + Cloudflare Worker setup:
+// 1) เปิด URL แบบนี้ครั้งแรก: https://<your-github-page>/RealStock/?api=<WORKER_REALSTOCK_URL>
 // 2) ระบบจะจำ API URL ไว้ใน localStorage
-// 3) หรือแก้ DEFAULT_GOOGLE_SCRIPT_URL ด้านล่างเป็น Web App URL ของ RealStock โดยตรง
-const DEFAULT_GOOGLE_SCRIPT_URL = "https://realstock-api.koobirdza.workers.dev/realstock";
+// 3) หรือแก้ DEFAULT_GOOGLE_SCRIPT_URL ด้านล่างเป็น Cloudflare Worker URL เช่น https://realstock-api.xxx.workers.dev/realstock
+const DEFAULT_GOOGLE_SCRIPT_URL = "";
 const params = new URLSearchParams(window.location.search);
 const apiFromQuery = params.get("api") || "";
 if (apiFromQuery) localStorage.setItem("realstock.apiUrl", apiFromQuery);
@@ -23,7 +23,7 @@ export const MODE_META = {
   receive: { label: "รับของ", color: "receive", saveLabel: "บันทึกรับของ", helper: "รับเข้าตามจำนวนจริงใน location ปลายทาง รองรับ conversion_qty" },
   order: { label: "สั่งของ", color: "order", saveLabel: "", helper: "รายงานจำนวนที่ควรสั่งจาก Policy_Item / Order_View" }
 };
-export const SAVE_TIMEOUT_MS = 12000;
+export const SAVE_TIMEOUT_MS = 15000;
 export const MAX_QTY = 999999;
 export const ENABLE_CONVERSION_QTY = true;
 export const ENABLE_COUNT_ISSUE_CONVERSION = true;
