@@ -1,34 +1,19 @@
-export const APP_VERSION = "v54.1.0-queue-stable";
-
-// GitHub Pages + Cloudflare Worker setup:
-// 1) เปิด URL แบบนี้ครั้งแรก: https://<your-github-page>/RealStock/?api=<WORKER_REALSTOCK_URL>
-// 2) ระบบจะจำ API URL ไว้ใน localStorage
-// 3) หรือแก้ DEFAULT_GOOGLE_SCRIPT_URL ด้านล่างเป็น Cloudflare Worker URL เช่น https://realstock-api.xxx.workers.dev/realstock
+export const APP_VERSION = "v54.1.3-complete-baseline-queue";
 const DEFAULT_GOOGLE_SCRIPT_URL = "https://realstock-api.koobirdza.workers.dev/realstock";
 const params = new URLSearchParams(window.location.search);
 const apiFromQuery = params.get("api") || "";
 if (apiFromQuery) localStorage.setItem("realstock.apiUrl", apiFromQuery);
 export const GOOGLE_SCRIPT_URL = apiFromQuery || localStorage.getItem("realstock.apiUrl") || DEFAULT_GOOGLE_SCRIPT_URL;
-
-export const ENABLE_SERVICE_WORKER = false;
-export const CACHE_TTL = { bootstrap: 5 * 60 * 1000, catalog: 10 * 60 * 1000, stock: 5 * 60 * 1000, orderView: 5 * 60 * 1000, diagnostics: 15 * 1000 };
-export const STORAGE_KEYS = { session: "realstock.v53_10.session", draft: "realstock.v53_10.draft", cachePrefix: "realstock.v53_10.cache.", lang: "realstock.v53_10.lang" };
-
-// usage_zones ถูกถอดออกแล้ว: issue ไม่ต้องเลือก usage destination
-export const ISSUE_DESTINATIONS = [];
-
+export const CACHE_TTL = { bootstrap: 5*60*1000, catalog: 10*60*1000, stock: 5*60*1000, orderView: 5*60*1000, diagnostics: 15*1000 };
+export const STORAGE_KEYS = { session: "realstock.v54_1_3.session", draft: "realstock.v54_1_3.draft", cachePrefix: "realstock.v54_1_3.cache.", lang: "realstock.v54_1_3.lang" };
 export const MODE_META = {
-  count: { label: "นับสต๊อก", color: "count", saveLabel: "บันทึกยอดนับ", helper: "กรอกยอดที่มีจริงของจุดนับนี้ แล้วบันทึกเป็น log ล่าสุด" },
-  issue: { label: "เบิกของ", color: "issue", saveLabel: "บันทึกการเบิก", helper: "กรอกจำนวนที่เบิก/ใช้จริงจาก location นั้น ๆ" },
-  receive: { label: "รับของ", color: "receive", saveLabel: "บันทึกรับของ", helper: "รับเข้าตามจำนวนจริงใน location ปลายทาง รองรับ conversion_qty" },
-  order: { label: "สั่งของ", color: "order", saveLabel: "", helper: "รายงานจำนวนที่ควรสั่งจาก Policy_Item / Order_View" }
+  count: { label:"นับสต๊อก", color:"count", saveLabel:"บันทึกยอดนับ", helper:"กรอกยอดที่มีจริงของจุดนับนี้" },
+  issue: { label:"เบิกของ", color:"issue", saveLabel:"บันทึกการเบิก", helper:"กรอกจำนวนที่เบิก/ใช้จริง" },
+  receive: { label:"รับของ", color:"receive", saveLabel:"บันทึกรับของ", helper:"กรอกจำนวนรับเข้าจริง" },
+  order: { label:"สั่งของ", color:"order", saveLabel:"", helper:"ดูรายการควรสั่ง" },
+  transfer: { label:"โอนย้าย", color:"order", saveLabel:"บันทึกโอนย้าย", helper:"ย้ายของระหว่าง location" }
 };
-export const SAVE_TIMEOUT_MS = 15000;
-export const MAX_QTY = 999999;
-export const ENABLE_CONVERSION_QTY = true;
-export const ENABLE_COUNT_ISSUE_CONVERSION = true;
-
-// Performance: render long item lists progressively on mobile.
+export const SAVE_TIMEOUT_MS = 12000;
 export const MAX_RENDER_ITEMS_INITIAL = 80;
 export const MAX_RENDER_ITEMS_STEP = 80;
 export const ENABLE_IDLE_PRELOAD = true;
