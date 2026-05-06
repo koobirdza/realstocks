@@ -1,5 +1,4 @@
-export const state = { mode:'count', catalog:{count:[],receive:[],issue:[],order:[],transfer:[]}, visibleCount:80, draft:{}, employee:'', apiReady:false };
-export function setMode(mode){ state.mode=mode; state.visibleCount=80; }
-export function setCatalog(mode, rows){ state.catalog[mode]=rows||[]; }
-export function setQty(key, qty){ state.draft[key]=qty; }
-export function clearDraft(){ state.draft={}; }
+export const state = { employee: "", mode: "", path: [], destination: "", catalogRowsByMode: {}, treeByMode: {}, stockMap: {}, orderRows: [], saveInFlight: false, lastCacheStamp: "", admin: false, scheduleBadgeByPath: {}, instantReadyModes: {}, infoBanner: "", nightlyCutoffHour: 22, receiveDate: "", bootstrapped: false, visibleLimitByPath: {} };
+export function resetNav() { state.path = []; state.destination = ""; }
+export function setEmployee(v) { state.employee = v || ""; }
+export function setMode(v) { state.mode = v || ""; resetNav(); }
