@@ -1,6 +1,5 @@
-import { CACHE_TTL, GOOGLE_SCRIPT_URL, SAVE_TIMEOUT_MS } from "./config.v53.9.js";
+import { CACHE_TTL, GOOGLE_SCRIPT_URL } from "./config.v53.9.js";
 import { getCache, setCache, clearCache } from "./store.v53.9.js";
-import { withTimeout } from "./utils.v53.9.js";
 
 function buildUrl(action, params = {}) {
   if (!GOOGLE_SCRIPT_URL) throw new Error("Missing RealStock API URL");
@@ -93,7 +92,7 @@ export async function submitAction(action, requestId, rows) {
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
       body: JSON.stringify(payload)
-    }), SAVE_TIMEOUT_MS, "queue save timeout");
+    });
 
     const text = await res.text();
     let json;
