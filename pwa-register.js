@@ -1,1 +1,1 @@
-// RealStock v53.9.0: Service worker registration is controlled by src/app.v53.9.js
+if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
