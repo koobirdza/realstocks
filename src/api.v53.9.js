@@ -47,29 +47,41 @@ export const adminWarm = () => getJson("adminWarm", { admin: 1 });
 export const adminBuildCatalogView = () => getJson("adminBuildCatalogView", { admin: 1 });
 export const adminNightly = () => getJson("adminNightly", { admin: 1 });
 export const adminProcessQueue = (rebuild = false) => getJson("adminProcessQueue", { admin: 1, rebuild: rebuild ? 1 : "" });
+export const adminInstallQueueTrigger = () => getJson("adminInstallQueueTrigger", { admin: 1 });
+export const queueStatus = () => getJson("queueStatus", {}, "queue.status", 5000);
+export const queueItems = (limit = 20) => getJson("queueItems", { limit }, "queue.items", 5000);
 
 function normalizeRowsForQueue(action, rows) {
-  return (rows || []).map((row) => ({
-    item_key: row.item_key || row.itemKey || "",
-    item_name: row.item_name || row.item_name_th || "",
-    brand: row.brand || "",
-    qty: Number(row.qty_input ?? row.entered_qty ?? row.qty ?? 0),
-    qty_input: Number(row.qty_input ?? row.entered_qty ?? row.qty ?? 0),
-    unit: row.unit || row.input_unit || row.base_unit || row.purchase_unit || "",
-    base_unit: row.base_unit || "",
-    purchase_unit: row.purchase_unit || "",
-    conversion_qty: Number(row.conversion_qty || 1),
-    stock_zone: row.stock_zone || row.location || row.mode_target || row.mode_target_key || "",
-    location: row.stock_zone || row.location || row.mode_target || row.mode_target_key || "",
-    mode_target: row.mode_target || row.mode_target_key || row.stock_zone || row.location || "",
-    employee: row.employee || "",
-    note: row.note || "",
-    reason_code: row.reason_code || "",
-    allow_negative: row.allow_negative || "",
-    from_stock_zone: row.from_stock_zone || row.from_location || "",
-    to_stock_zone: row.to_stock_zone || row.to_location || "",
-    action
-  }));
+  return (rows || []).map((row) => {
+    const qty = Number(row.qty_input ?? row.entered_qty ?? row.qty ?? 0);
+    const location = row.stock_zone || row.location || row.mode_target || row.mode_target_key || "";
+    return {
+      item_key: row.item_key || row.itemKey || "",
+      item_name: row.item_name || row.item_name_th || "",
+      item_name_th: row.item_name_th || row.item_name || "",
+      brand: row.brand || "",
+      qty,
+      qty_input: qty,
+      unit: row.unit || row.input_unit || row.base_unit || row.purchase_unit || "",
+      input_unit: row.input_unit || row.unit || row.base_unit || row.purchase_unit || "",
+      base_unit: row.base_unit || "",
+      purchase_unit: row.purchase_unit || "",
+      conversion_qty: Number(row.conversion_qty || 1),
+      stock_zone: location,
+      location,
+      mode_target: row.mode_target || row.mode_target_key || location,
+      category: row.category || location,
+      main_category: row.main_category || "",
+      sub_category: row.sub_category || "",
+      employee: row.employee || "",
+      note: row.note || "",
+      reason_code: row.reason_code || "",
+      allow_negative: row.allow_negative || "",
+      from_stock_zone: row.from_stock_zone || row.from_location || "",
+      to_stock_zone: row.to_stock_zone || row.to_location || "",
+      action
+    };
+  });
 }
 
 export async function submitAction(action, requestId, rows) {
@@ -83,7 +95,7 @@ export async function submitAction(action, requestId, rows) {
     requestId,
     rows: normalizeRowsForQueue(action, rows),
     queue: true,
-    clientVersion: "v54.1.0-queue-stable"
+    clientVersion: "v54.1.0-stable-queue-patch"
   };
 
   try {
@@ -99,7 +111,7 @@ export async function submitAction(action, requestId, rows) {
     try {
       json = JSON.parse(text);
     } catch (err) {
-      return { ok: false, message: `invalid json from queue backend: ${text.slice(0, 180)}` };
+      return { ok: false, queued: false, message: `invalid json from queue backend: ${text.slice(0, 180)}` };
     }
 
     if (json?.ok) {
