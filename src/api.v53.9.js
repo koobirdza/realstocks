@@ -114,14 +114,40 @@ export async function submitAction(action, requestId, rows) {
       return { ok: false, queued: false, message: `invalid json from queue backend: ${text.slice(0, 180)}` };
     }
 
-    if (json?.ok) {
-      clearDataCaches();
-      return {
-        ...json,
-        queued: json.queued !== false,
-        message: json.message || "บันทึกเข้าคิวแล้ว"
-      };
-    }
+if (json?.ok) {
+
+  clearDataCaches();
+
+  // IMPORTANT:
+  // Event-driven queue processing
+  // instead of cron polling
+
+  try {
+
+    await fetch(
+      buildUrl("adminProcessQueue", {
+        admin: 1
+      }),
+      {
+        method: "GET",
+        cache: "no-store"
+      }
+    );
+
+  } catch(processErr) {
+
+    console.error(
+      "queue process failed",
+      processErr
+    );
+  }
+
+  return {
+    ...json,
+    queued: json.queued !== false,
+    message: json.message || "บันทึกเข้าคิวแล้ว"
+  };
+}
 
     return json;
   } catch (err) {
