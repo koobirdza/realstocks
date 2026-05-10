@@ -3,12 +3,55 @@ import { getCache, setCache, clearCache } from "./store.v53.9.js";
 
 function buildUrl(action, params = {}) {
   if (!GOOGLE_SCRIPT_URL) throw new Error("Missing RealStock API URL");
+
   const url = new URL(GOOGLE_SCRIPT_URL);
   url.searchParams.set("action", action);
+
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
+    if (v !== undefined && v !== null && v !== "") {
+      url.searchParams.set(k, v);
+    }
   });
+
   return url.toString();
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 30000) {
+  const controller = new AbortController();
+
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+
+    const text = await res.text();
+
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      return {
+        ok: false,
+        message: `invalid json: ${text.slice(0, 200)}`
+      };
+    }
+
+  } catch (err) {
+    return {
+      ok: false,
+      message:
+        err?.name === "AbortError"
+          ? "request timeout"
+          : err?.message || String(err)
+    };
+
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function getJson(action, params = {}, cacheName = "", ttlMs = 0) {
@@ -17,13 +60,19 @@ export async function getJson(action, params = {}, cacheName = "", ttlMs = 0) {
     if (hit?.value) return hit.value;
   }
 
-  const res = await fetch(buildUrl(action, { ...params, _: Date.now() }), {
-    method: "GET",
-    cache: "no-store"
-  });
+  const json = await fetchJsonWithTimeout(
+    buildUrl(action, { ...params, _: Date.now() }),
+    {
+      method: "GET",
+      cache: "no-store"
+    },
+    30000
+  );
 
-  const json = await res.json();
-  if (cacheName && ttlMs > 0 && json?.ok) setCache(cacheName, json, ttlMs);
+  if (cacheName && ttlMs > 0 && json?.ok) {
+    setCache(cacheName, json, ttlMs);
+  }
+
   return json;
 }
 
@@ -37,119 +86,191 @@ export function clearDataCaches() {
 }
 
 export const health = () => getJson("health");
-export const diagnostics = () => getJson("diagnostics", { admin: 1 }, "diag.admin", CACHE_TTL.diagnostics);
-export const preflight = () => getJson("preflight", { admin: 1 });
-export const bootstrapData = () => getJson("bootstrapLite", {}, "bootstrap.lite", CACHE_TTL.bootstrap);
-export const getCatalog = (mode) => getJson("catalog", { mode }, `catalog.${mode}`, CACHE_TTL.catalog);
-export const getCurrentStock = () => getJson("currentStock", {}, "stock.current", CACHE_TTL.stock);
-export const getOrderView = () => getJson("orderView", {}, "order.view", CACHE_TTL.orderView);
-export const adminWarm = () => getJson("adminWarm", { admin: 1 });
-export const adminBuildCatalogView = () => getJson("adminBuildCatalogView", { admin: 1 });
-export const adminNightly = () => getJson("adminNightly", { admin: 1 });
-export const adminProcessQueue = (rebuild = false) => getJson("adminProcessQueue", { admin: 1, rebuild: rebuild ? 1 : "" });
-export const adminInstallQueueTrigger = () => getJson("adminInstallQueueTrigger", { admin: 1 });
-export const queueStatus = () => getJson("queueStatus", {}, "queue.status", 5000);
-export const queueItems = (limit = 20) => getJson("queueItems", { limit }, "queue.items", 5000);
+
+export const diagnostics = () =>
+  getJson("diagnostics", { admin: 1 }, "diag.admin", CACHE_TTL.diagnostics);
+
+export const preflight = () =>
+  getJson("preflight", { admin: 1 });
+
+export const bootstrapData = () =>
+  getJson("bootstrapLite", {}, "bootstrap.lite", CACHE_TTL.bootstrap);
+
+export const getCatalog = (mode) =>
+  getJson("catalog", { mode }, `catalog.${mode}`, CACHE_TTL.catalog);
+
+export const getCurrentStock = () =>
+  getJson("currentStock", {}, "stock.current", CACHE_TTL.stock);
+
+export const getOrderView = () =>
+  getJson("orderView", {}, "order.view", CACHE_TTL.orderView);
+
+export const adminWarm = () =>
+  getJson("adminWarm", { admin: 1 });
+
+export const adminBuildCatalogView = () =>
+  getJson("adminBuildCatalogView", { admin: 1 });
+
+export const adminNightly = () =>
+  getJson("adminNightly", { admin: 1 });
+
+export const adminProcessQueue = (rebuild = false) =>
+  getJson("adminProcessQueue", {
+    admin: 1,
+    limit: 1,
+    rebuild: rebuild ? 1 : ""
+  });
+
+export const adminInstallQueueTrigger = () =>
+  getJson("adminInstallQueueTrigger", { admin: 1 });
+
+export const queueStatus = () =>
+  getJson("queueStatus", {}, "queue.status", 5000);
+
+export const queueItems = (limit = 20) =>
+  getJson("queueItems", { limit }, "queue.items", 5000);
 
 function normalizeRowsForQueue(action, rows) {
   return (rows || []).map((row) => {
     const qty = Number(row.qty_input ?? row.entered_qty ?? row.qty ?? 0);
-    const location = row.stock_zone || row.location || row.mode_target || row.mode_target_key || "";
+
+    const location =
+      row.stock_zone ||
+      row.location ||
+      row.mode_target ||
+      row.mode_target_key ||
+      "";
+
     return {
       item_key: row.item_key || row.itemKey || "",
       item_name: row.item_name || row.item_name_th || "",
       item_name_th: row.item_name_th || row.item_name || "",
       brand: row.brand || "",
+
       qty,
       qty_input: qty,
-      unit: row.unit || row.input_unit || row.base_unit || row.purchase_unit || "",
-      input_unit: row.input_unit || row.unit || row.base_unit || row.purchase_unit || "",
+
+      unit:
+        row.unit ||
+        row.input_unit ||
+        row.base_unit ||
+        row.purchase_unit ||
+        "",
+
+      input_unit:
+        row.input_unit ||
+        row.unit ||
+        row.base_unit ||
+        row.purchase_unit ||
+        "",
+
       base_unit: row.base_unit || "",
       purchase_unit: row.purchase_unit || "",
       conversion_qty: Number(row.conversion_qty || 1),
+
       stock_zone: location,
       location,
       mode_target: row.mode_target || row.mode_target_key || location,
+
       category: row.category || location,
       main_category: row.main_category || "",
       sub_category: row.sub_category || "",
+
       employee: row.employee || "",
       note: row.note || "",
       reason_code: row.reason_code || "",
       allow_negative: row.allow_negative || "",
+
       from_stock_zone: row.from_stock_zone || row.from_location || "",
       to_stock_zone: row.to_stock_zone || row.to_location || "",
+
       action
     };
   });
 }
 
 export async function submitAction(action, requestId, rows) {
-  if (!GOOGLE_SCRIPT_URL) return { ok: false, message: "Missing RealStock API URL" };
-  if (!action) return { ok: false, message: "missing action" };
-  if (!requestId) return { ok: false, message: "missing requestId" };
-  if (!Array.isArray(rows) || !rows.length) return { ok: false, message: "missing rows" };
+  if (!GOOGLE_SCRIPT_URL) {
+    return { ok: false, message: "Missing RealStock API URL" };
+  }
+
+  if (!action) {
+    return { ok: false, message: "missing action" };
+  }
+
+  if (!requestId) {
+    return { ok: false, message: "missing requestId" };
+  }
+
+  if (!Array.isArray(rows) || !rows.length) {
+    return { ok: false, message: "missing rows" };
+  }
 
   const payload = {
     action,
     requestId,
     rows: normalizeRowsForQueue(action, rows),
     queue: true,
-    clientVersion: "v54.1.0-stable-queue-patch"
+    clientVersion: "v54.1.0-stable-queue-event-driven"
   };
 
   try {
-    const res = await fetch(GOOGLE_SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-      body: JSON.stringify(payload)
-    });
+    const saveJson = await fetchJsonWithTimeout(
+      GOOGLE_SCRIPT_URL,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify(payload)
+      },
+      30000
+    );
 
-    const text = await res.text();
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch (err) {
-      return { ok: false, queued: false, message: `invalid json from queue backend: ${text.slice(0, 180)}` };
+    if (!saveJson?.ok) {
+      return {
+        ...saveJson,
+        queued: false,
+        message: saveJson?.message || "save queue failed"
+      };
     }
 
-if (json?.ok) {
+    clearDataCaches();
 
-  clearDataCaches();
-
-  // IMPORTANT:
-  // Event-driven queue processing
-  // instead of cron polling
-
-  try {
-
-    await fetch(
+    const processJson = await fetchJsonWithTimeout(
       buildUrl("adminProcessQueue", {
-        admin: 1
+        admin: 1,
+        limit: 1
       }),
       {
         method: "GET",
         cache: "no-store"
-      }
+      },
+      30000
     );
 
-  } catch(processErr) {
+    if (!processJson?.ok) {
+      console.error("queue process failed", processJson);
 
-    console.error(
-      "queue process failed",
-      processErr
-    );
-  }
+      return {
+        ...saveJson,
+        queued: true,
+        processed: false,
+        processError: processJson,
+        message:
+          "บันทึกเข้าคิวแล้ว แต่ประมวลผลคิวยังไม่สำเร็จ กรุณากดประมวลผลอีกครั้ง"
+      };
+    }
 
-  return {
-    ...json,
-    queued: json.queued !== false,
-    message: json.message || "บันทึกเข้าคิวแล้ว"
-  };
-}
+    clearDataCaches();
 
-    return json;
+    return {
+      ...saveJson,
+      queued: true,
+      processed: true,
+      processResult: processJson,
+      message: saveJson.message || "บันทึกและประมวลผลเรียบร้อยแล้ว"
+    };
+
   } catch (err) {
     return {
       ok: false,
