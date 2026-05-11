@@ -130,6 +130,18 @@ export const queueStatus = () =>
 export const queueItems = (limit = 20) =>
   getJson("queueItems", { limit }, "queue.items", 5000);
 
+  // OPTIONAL: ADD THESE EXPORTS TO frontend/src/api.v53.9.js
+
+export const snapshotBootstrap = () =>
+  getJson("snapshotBootstrap", {}, "snapshot.bootstrap", CACHE_TTL.bootstrap || 300000);
+
+export const snapshotStatus = () =>
+  getJson("snapshotStatus", { admin: 1 }, "snapshot.status", 10000);
+
+export const adminRebuildSnapshot = () =>
+  getJson("adminRebuildSnapshot", { admin: 1 });
+
+
 function normalizeRowsForQueue(action, rows) {
   return (rows || []).map((row) => {
     const qty = Number(row.qty_input ?? row.entered_qty ?? row.qty ?? 0);
@@ -278,15 +290,5 @@ export async function submitAction(action, requestId, rows) {
       message: err?.message || String(err)
     };
   }
-  // OPTIONAL: ADD THESE EXPORTS TO frontend/src/api.v53.9.js
-
-export const snapshotBootstrap = () =>
-  getJson("snapshotBootstrap", {}, "snapshot.bootstrap", CACHE_TTL.bootstrap || 300000);
-
-export const snapshotStatus = () =>
-  getJson("snapshotStatus", { admin: 1 }, "snapshot.status", 10000);
-
-export const adminRebuildSnapshot = () =>
-  getJson("adminRebuildSnapshot", { admin: 1 });
 
 }
