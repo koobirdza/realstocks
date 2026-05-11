@@ -278,4 +278,15 @@ export async function submitAction(action, requestId, rows) {
       message: err?.message || String(err)
     };
   }
+  // OPTIONAL: ADD THESE EXPORTS TO frontend/src/api.v53.9.js
+
+export const snapshotBootstrap = () =>
+  getJson("snapshotBootstrap", {}, "snapshot.bootstrap", CACHE_TTL.bootstrap || 300000);
+
+export const snapshotStatus = () =>
+  getJson("snapshotStatus", { admin: 1 }, "snapshot.status", 10000);
+
+export const adminRebuildSnapshot = () =>
+  getJson("adminRebuildSnapshot", { admin: 1 });
+
 }
