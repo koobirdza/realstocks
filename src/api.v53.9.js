@@ -18,10 +18,7 @@ function buildUrl(action, params = {}) {
 
 async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 30000) {
   const controller = new AbortController();
-
-  const timeout = setTimeout(() => {
-    controller.abort();
-  }, timeoutMs);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch(url, {
@@ -36,10 +33,10 @@ async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 30000) {
     } catch (err) {
       return {
         ok: false,
+        status: res.status,
         message: `invalid json: ${text.slice(0, 200)}`
       };
     }
-
   } catch (err) {
     return {
       ok: false,
@@ -48,13 +45,12 @@ async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 30000) {
           ? "request timeout"
           : err?.message || String(err)
     };
-
   } finally {
     clearTimeout(timeout);
   }
 }
 
-export async function getJson(action, params = {}, cacheName = "", ttlMs = 0) {
+export async function getJson(action, params = {}, cacheName = "", ttlMs = 0, timeoutMs = 30000) {
   if (cacheName && ttlMs > 0) {
     const hit = getCache(cacheName);
     if (hit?.value) return hit.value;
@@ -66,7 +62,7 @@ export async function getJson(action, params = {}, cacheName = "", ttlMs = 0) {
       method: "GET",
       cache: "no-store"
     },
-    30000
+    timeoutMs
   );
 
   if (cacheName && ttlMs > 0 && json?.ok) {
@@ -83,6 +79,7 @@ export function clearDataCaches() {
   clearCache("order.");
   clearCache("diag.");
   clearCache("queue.");
+  clearCache("snapshot.");
 }
 
 export const health = () => getJson("health");
@@ -97,29 +94,35 @@ export const bootstrapData = () =>
   getJson("bootstrapLite", {}, "bootstrap.lite", CACHE_TTL.bootstrap);
 
 export const getCatalog = (mode) =>
-  getJson("catalog", { mode }, `catalog.${mode}`, CACHE_TTL.catalog);
+  getJson("catalog", { mode }, `catalog.${mode}`, CACHE_TTL.catalog, 60000);
 
 export const getCurrentStock = () =>
-  getJson("currentStock", {}, "stock.current", CACHE_TTL.stock);
+  getJson("currentStock", {}, "stock.current", CACHE_TTL.stock, 60000);
 
 export const getOrderView = () =>
-  getJson("orderView", {}, "order.view", CACHE_TTL.orderView);
+  getJson("orderView", {}, "order.view", CACHE_TTL.orderView, 60000);
 
 export const adminWarm = () =>
-  getJson("adminWarm", { admin: 1 });
+  getJson("adminWarm", { admin: 1 }, "", 0, 60000);
 
 export const adminBuildCatalogView = () =>
-  getJson("adminBuildCatalogView", { admin: 1 });
+  getJson("adminBuildCatalogView", { admin: 1 }, "", 0, 60000);
 
 export const adminNightly = () =>
-  getJson("adminNightly", { admin: 1 });
+  getJson("adminNightly", { admin: 1 }, "", 0, 60000);
 
 export const adminProcessQueue = (rebuild = false) =>
-  getJson("adminProcessQueue", {
-    admin: 1,
-    limit: 1,
-    rebuild: rebuild ? 1 : ""
-  });
+  getJson(
+    "adminProcessQueue",
+    {
+      admin: 1,
+      limit: 1,
+      rebuild: rebuild ? 1 : ""
+    },
+    "",
+    0,
+    60000
+  );
 
 export const adminInstallQueueTrigger = () =>
   getJson("adminInstallQueueTrigger", { admin: 1 });
@@ -130,17 +133,21 @@ export const queueStatus = () =>
 export const queueItems = (limit = 20) =>
   getJson("queueItems", { limit }, "queue.items", 5000);
 
-  // OPTIONAL: ADD THESE EXPORTS TO frontend/src/api.v53.9.js
-
-export const snapshotBootstrap = () =>
-  getJson("snapshotBootstrap", {}, "snapshot.bootstrap", CACHE_TTL.bootstrap || 300000);
+// Phase 1 Snapshot JSON
+export const snapshotBootstrap = (force = false) =>
+  getJson(
+    "snapshotBootstrap",
+    { force: force ? 1 : "" },
+    "snapshot.bootstrap",
+    CACHE_TTL.bootstrap || 300000,
+    60000
+  );
 
 export const snapshotStatus = () =>
   getJson("snapshotStatus", { admin: 1 }, "snapshot.status", 10000);
 
 export const adminRebuildSnapshot = () =>
-  getJson("adminRebuildSnapshot", { admin: 1 });
-
+  getJson("adminRebuildSnapshot", { admin: 1 }, "", 0, 60000);
 
 function normalizeRowsForQueue(action, rows) {
   return (rows || []).map((row) => {
@@ -257,7 +264,7 @@ export async function submitAction(action, requestId, rows) {
         method: "GET",
         cache: "no-store"
       },
-      30000
+      60000
     );
 
     if (!processJson?.ok) {
@@ -273,6 +280,19 @@ export async function submitAction(action, requestId, rows) {
       };
     }
 
+    try {
+      await fetchJsonWithTimeout(
+        buildUrl("adminRebuildSnapshot", { admin: 1 }),
+        {
+          method: "GET",
+          cache: "no-store"
+        },
+        60000
+      );
+    } catch (snapshotErr) {
+      console.warn("snapshot rebuild failed", snapshotErr);
+    }
+
     clearDataCaches();
 
     return {
@@ -282,7 +302,6 @@ export async function submitAction(action, requestId, rows) {
       processResult: processJson,
       message: saveJson.message || "บันทึกและประมวลผลเรียบร้อยแล้ว"
     };
-
   } catch (err) {
     return {
       ok: false,
@@ -290,5 +309,4 @@ export async function submitAction(action, requestId, rows) {
       message: err?.message || String(err)
     };
   }
-
 }
