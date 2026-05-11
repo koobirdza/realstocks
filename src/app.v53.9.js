@@ -3,7 +3,7 @@ import { state, setEmployee, setMode, resetNav } from "./state.v53.9.js";
 import { restoreSession, persistSession, logoutSession } from "./auth.v53.9.js";
 import { bindDom, refreshStaticText, renderSession, setHealth, showError, toast, renderAdmin, renderBreadcrumb, renderDestinationPicker, renderNodesFromHtml, renderItems, renderSkeleton, setSaveLocked } from "./ui.v53.9.js";
 import { t, getLang, setLang } from "./i18n.v53.9.js";
-import { bootstrapData, getCatalog, health, submitAction, clearDataCaches, adminWarm, adminNightly, diagnostics, preflight } from "./api.v53.9.js";
+import { bootstrapData, getCatalog, snapshotBootstrap, health, submitAction, clearDataCaches, adminWarm, adminNightly, diagnostics, preflight } from "./api.v53.9.js";
 import { getNodeByPath, needsDestination, warmCatalogMode, getWarmMode } from "./catalog.v53.9.js";
 import { collectRows } from "./inventory.v53.9.js";
 import { $, $$, createRequestId, params, debounce } from "./utils.v53.9.js";
@@ -20,18 +20,54 @@ async function refreshDiagnostics() { if (!state.admin) return; try { const [dia
 function applyWarmMode(mode, rows, cached = false) { const warmed = warmCatalogMode(mode, rows || []); state.catalogRowsByMode[mode] = rows || []; state.treeByMode[mode] = warmed.tree; state.instantReadyModes[mode] = true; if (state.mode === mode) { state.scheduleBadgeByPath = warmed.scheduleBadgeByPath; state.lastCacheStamp = cached ? 'ใช้แคช • อ้างอิงรอบข้อมูลล่าสุด 22:00' : 'พร้อมใช้งาน • โหลดครั้งเดียวแล้วใช้ต่อ'; } }
 async function ensureBootstrapLoaded(force = false) {
   if (state.bootstrapped && !force) return;
+
+  const snap = await snapshotBootstrap(force).catch(() => null);
+
+  if (snap?.ok && snap.snapshot_type === "bootstrap") {
+    state.stockMap = snap.current_stock_by_key || {};
+    state.orderRows = snap.order_rows || [];
+    state.nightlyCutoffHour = Number(snap.nightlyCutoffHour || snap.nightly_cutoff_hour || 22);
+    state.snapshotBootstrap = snap;
+    state.bootstrapped = true;
+
+    const catalog = snap.catalog || {};
+    ["count", "issue", "receive", "order"].forEach((mode) => {
+      if (Array.isArray(catalog[mode])) {
+        applyWarmMode(mode, catalog[mode], true);
+      }
+    });
+
+    state.lastCacheStamp = getLang()==='lo'
+      ? 'ພ້ອມໃຊ້ງານ • ໂຫຼດ Snapshot ແລ້ວ'
+      : 'พร้อมใช้งาน • โหลด Snapshot แล้ว';
+    return;
+  }
+
   const boot = await bootstrapData();
   if (!boot?.ok) throw new Error(boot?.message || 'โหลดข้อมูลเริ่มต้นไม่สำเร็จ');
   state.stockMap = boot.stock || {};
   state.orderRows = boot.orderView || [];
   state.nightlyCutoffHour = Number(boot.nightlyCutoffHour || 22);
   state.bootstrapped = true;
-  state.lastCacheStamp = getLang()==='lo' ? 'ພ້ອມໃຊ້ງານ • ໂຫຼດຂໍ້ມູນເບື້ອງຕົ້ນແລ້ວ' : 'พร้อมใช้งาน • โหลดข้อมูลเบื้องต้นแล้ว';
+  state.lastCacheStamp = getLang()==='lo'
+    ? 'ພ້ອມໃຊ້ງານ • ໂຫຼດຂໍ້ມູນເບື້ອງຕົ້ນແລ້ວ'
+    : 'พร้อมใช้งาน • โหลดข้อมูลเบื้องต้นแล้ว';
 }
 
 async function ensureCatalogLoaded(mode, force = false) {
   if (!mode) return;
   if (state.instantReadyModes[mode] && !force) return;
+
+  await ensureBootstrapLoaded(force);
+
+  const snapRows = state.snapshotBootstrap?.catalog?.[mode];
+  if (Array.isArray(snapRows)) {
+    applyWarmMode(mode, snapRows, true);
+    state.scheduleBadgeByPath = getWarmMode(mode).scheduleBadgeByPath;
+    state.lastCacheStamp = 'ใช้ Snapshot ล่าสุด';
+    return;
+  }
+
   const payload = await getCatalog(mode);
   if (!payload?.ok) throw new Error(payload?.message || `โหลดหมวด ${mode} ไม่สำเร็จ`);
   applyWarmMode(mode, payload.rows || [], payload.cached === true);
@@ -41,6 +77,8 @@ async function ensureCatalogLoaded(mode, force = false) {
 
 function preloadOtherCatalogModes(activeMode) {
   if (!ENABLE_IDLE_PRELOAD) return;
+  if (state.snapshotBootstrap?.catalog) return;
+
   const modes = ["count", "issue", "receive", "order"].filter((mode) => mode !== activeMode && !state.instantReadyModes[mode]);
   const runner = async () => {
     for (const mode of modes) {
@@ -174,6 +212,16 @@ async function handleSave() {
     }
 
     clearDraft();
+
+    try {
+      clearDataCaches();
+      state.bootstrapped = false;
+      state.instantReadyModes = {};
+      await ensureBootstrapLoaded(true);
+    } catch (refreshErr) {
+      console.warn("snapshot refresh after save failed", refreshErr);
+    }
+
     if (state.path.length) state.path.pop();
     render();
     toast(t('accepted', { hour: state.nightlyCutoffHour }), 'success', 2000);
