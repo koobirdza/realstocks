@@ -8,6 +8,7 @@ import { getNodeByPath, needsDestination, warmCatalogMode, getWarmMode } from ".
 import { collectRows } from "./inventory.v53.9.js";
 import { $, $$, createRequestId, params, debounce } from "./utils.v53.9.js";
 import { setDraft, getDraft, clearDraft, getCache, setCache } from "./store.v53.9.js";
+import { idbSet } from "./idb.v53.9.js";
 function currentWarm() { return getWarmMode(state.mode); }
 function currentTree() { return currentWarm().tree; }
 function currentNode() { return getNodeByPath(currentTree(), state.path) || currentTree(); }
@@ -17,7 +18,7 @@ const autosaveDraft = debounce(() => { if (state.mode === 'order') return; const
 function attachInputAutosave() { if (state.mode === 'order') return; $$('[data-qty-index]', document).forEach((el) => el.addEventListener('input', autosaveDraft)); $('clearBtn')?.addEventListener('click', () => { $$('[data-qty-index]', document).forEach((el) => el.value = ''); clearDraft(); toast(t('cleared')); }); $('restoreBtn')?.addEventListener('click', () => { const draft = getDraft()?.value; if (!draft || draft.mode !== state.mode) return toast(t('noDraft'), 'info'); draft.values.forEach((row) => { const input = document.querySelector(`[data-qty-index="${row.index}"]`); if (input) input.value = row.value; }); toast(t('restored'), 'success'); }); }
 async function refreshHealth() { try { const res = await health(); state.nightlyCutoffHour = Number(res?.nightlyCutoffHour || 22); setHealth(!!res?.ok, res?.ok ? t('healthReady', { hour: state.nightlyCutoffHour }) : t('healthProblem', { message: res?.message || '' })); } catch (err) { setHealth(false, t('healthFail')); } }
 async function refreshDiagnostics() { if (!state.admin) return; try { const [diag, pf] = await Promise.all([diagnostics().catch(() => null), preflight().catch(() => null)]); const lines = []; if (diag?.ok) lines.push(`รอบคำนวณกลางคืน: ${diag.diagnostics.nightlyRuns || 0} • ล่าสุด: ${diag.diagnostics.lastNightlyAt || '-'}`); if (pf?.ok) lines.push(`สถานะตรวจความพร้อม: ${pf.summary.status}`); state.infoBanner = lines.join(' | ') || 'นับ/เบิก/รับของ = บันทึกลง log อย่างเดียว • สั่งของ = รายงานจากรอบคำนวณกลางคืน'; renderAdmin(); } catch (err) {} }
-function applyWarmMode(mode, rows, cached = false) { const warmed = warmCatalogMode(mode, rows || []); state.catalogRowsByMode[mode] = rows || []; state.treeByMode[mode] = warmed.tree; state.instantReadyModes[mode] = true; if (state.mode === mode) { state.scheduleBadgeByPath = warmed.scheduleBadgeByPath; state.lastCacheStamp = cached ? 'ใช้แคช • อ้างอิงรอบข้อมูลล่าสุด 22:00' : 'พร้อมใช้งาน • โหลดครั้งเดียวแล้วใช้ต่อ'; } }
+function applyWarmMode(mode, rows, cached = false) { const warmed = warmCatalogMode(mode, rows || []); state.catalogRowsByMode[mode] = rows || []; state.treeByMode[mode] = warmed.tree; state.instantReadyModes[mode] = true; if (state.mode === mode) { state.scheduleBadgeByPath = warmed.scheduleBadgeByPath; state.lastCacheStamp = cached ? 'ใช้แคชเครื่องนี้ • Snapshot ล่าสุด 22:00' : 'พร้อมใช้งาน • โหลดครั้งเดียวแล้วใช้ต่อ'; } }
 async function ensureBootstrapLoaded(force = false) {
   if (state.bootstrapped && !force) return;
 
@@ -121,6 +122,56 @@ function applyLatestCountUpdates(updates = []) {
   }
 }
 
+
+function optimisticQtyBase(row = {}) {
+  const qty = Number(row.qty_input ?? row.entered_qty ?? row.qty ?? 0) || 0;
+  const conversion = Number(row.conversion_qty || 1) || 1;
+  const entryMode = state.mode === 'receive' ? row.receive_entry_mode : state.mode === 'issue' ? row.issue_entry_mode : row.count_entry_mode;
+  return entryMode === 'purchase' ? qty * conversion : qty;
+}
+
+function persistBootstrapCache() {
+  const snap = state.snapshotBootstrap;
+  if (!snap?.ok) return;
+  snap.current_stock_by_key = state.stockMap || {};
+  snap.current_stock_rows = Object.values(state.stockMap || {});
+  setCache('snapshot.bootstrap', snap, 5 * 60 * 1000);
+  idbSet('snapshot.bootstrap', snap, 12 * 60 * 60 * 1000);
+}
+
+function applyOptimisticStockUpdates(rows = []) {
+  if (!Array.isArray(rows) || !rows.length) return;
+  const now = new Date().toISOString();
+
+  rows.forEach((row) => {
+    const key = String(row.item_key || '');
+    if (!key) return;
+
+    const prev = state.stockMap[key] || {};
+    const qtyBase = optimisticQtyBase(row);
+    const previousStock = Number(prev.current_stock ?? prev.latest_count_qty ?? 0) || 0;
+    let nextStock = previousStock;
+
+    if (state.mode === 'count') nextStock = qtyBase;
+    if (state.mode === 'receive') nextStock = previousStock + qtyBase;
+    if (state.mode === 'issue') nextStock = previousStock - qtyBase;
+
+    state.stockMap[key] = {
+      ...prev,
+      item_key: key,
+      current_stock: nextStock,
+      current_stock_display: nextStock,
+      updated_at: now,
+      pending_local_update: true,
+      latest_count_ts: state.mode === 'count' ? now : (prev.latest_count_ts || ''),
+      latest_count_qty: state.mode === 'count' ? qtyBase : (prev.latest_count_qty ?? prev.current_stock ?? nextStock),
+      nightly_snapshot_date: prev.nightly_snapshot_date || row.snapshot_date || ''
+    };
+  });
+
+  persistBootstrapCache();
+}
+
 function render() {
   renderSession();
   renderAdmin();
@@ -207,19 +258,19 @@ async function handleSave() {
     const res = await submitAction(state.mode, requestId, rows);
     if (!res?.ok) throw new Error(res?.message || t('saveFailed'));
 
+    applyOptimisticStockUpdates(rows);
+
     if (state.mode === 'count' && Array.isArray(res.latestCountUpdates) && res.latestCountUpdates.length) {
       applyLatestCountUpdates(res.latestCountUpdates);
     }
 
     clearDraft();
 
-    // Fast-save patch: do not force reload Snapshot/Bootstrap after every save.
-    // The request is already queued; queue processing + nightly-style snapshot rebuild happens in backend/background.
-    clearDataCaches();
-
+    // v51: no forced Snapshot refresh after save. Snapshot rebuild is nightly at 22:00.
+    // This makes Save return as soon as the transaction is accepted.
     if (state.path.length) state.path.pop();
     render();
-    toast(t('accepted', { hour: state.nightlyCutoffHour }), 'success', 2000);
+    toast(res?.message || t('accepted', { hour: state.nightlyCutoffHour }), 'success', 2000);
   } catch (err) {
     showError(err?.message || t('saveFailed'));
     toast('เกิดข้อผิดพลาด', 'error');
@@ -296,7 +347,7 @@ function bindEvents() {
     const res = await adminWarm();
     toast(res?.ok ? 'สร้าง Catalog_View และ warm cache สำเร็จ' : t('warmFail'), res?.ok ? 'success' : 'error');
     if (res?.ok) {
-      clearDataCaches();
+      clearDataCaches({ indexedDB: true });
       state.bootstrapped = false;
       if (state.mode) await ensureCatalogLoaded(state.mode, true);
     }
@@ -307,7 +358,7 @@ function bindEvents() {
     const res = await adminNightly();
     toast(res?.ok ? `${t('nightlyOk')} • ${res.orderRows}` : t('nightlyFail'), res?.ok ? 'success' : 'error', 2500);
     if (res?.ok) {
-      clearDataCaches();
+      clearDataCaches({ indexedDB: true });
       state.bootstrapped = false;
       await ensureBootstrapLoaded(true);
       if (state.mode) await ensureCatalogLoaded(state.mode, true);

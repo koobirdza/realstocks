@@ -1,4 +1,4 @@
-export const APP_VERSION = "v54.1.0-queue-stable";
+export const APP_VERSION = "v51.0.0-nightly-idb-fast-save";
 
 // GitHub Pages + Cloudflare Worker setup:
 // 1) เปิด URL แบบนี้ครั้งแรก: https://<your-github-page>/RealStock/?api=<WORKER_REALSTOCK_URL>
@@ -11,8 +11,14 @@ if (apiFromQuery) localStorage.setItem("realstock.apiUrl", apiFromQuery);
 export const GOOGLE_SCRIPT_URL = apiFromQuery || localStorage.getItem("realstock.apiUrl") || DEFAULT_GOOGLE_SCRIPT_URL;
 
 export const ENABLE_SERVICE_WORKER = false;
-export const CACHE_TTL = { bootstrap: 5 * 60 * 1000, catalog: 10 * 60 * 1000, stock: 5 * 60 * 1000, orderView: 5 * 60 * 1000, diagnostics: 15 * 1000 };
-export const STORAGE_KEYS = { session: "realstock.v53_10.session", draft: "realstock.v53_10.draft", cachePrefix: "realstock.v53_10.cache.", lang: "realstock.v53_10.lang" };
+export const CACHE_TTL = {
+  bootstrap: 12 * 60 * 60 * 1000,
+  catalog: 12 * 60 * 60 * 1000,
+  stock: 12 * 60 * 60 * 1000,
+  orderView: 12 * 60 * 60 * 1000,
+  diagnostics: 15 * 1000
+};
+export const STORAGE_KEYS = { session: "realstock.v51.session", draft: "realstock.v51.draft", cachePrefix: "realstock.v51.cache.", lang: "realstock.v51.lang" };
 
 // usage_zones ถูกถอดออกแล้ว: issue ไม่ต้องเลือก usage destination
 export const ISSUE_DESTINATIONS = [];
@@ -23,7 +29,7 @@ export const MODE_META = {
   receive: { label: "รับของ", color: "receive", saveLabel: "บันทึกรับของ", helper: "รับเข้าตามจำนวนจริงใน location ปลายทาง รองรับ conversion_qty" },
   order: { label: "สั่งของ", color: "order", saveLabel: "", helper: "รายงานจำนวนที่ควรสั่งจาก Policy_Item / Order_View" }
 };
-export const SAVE_TIMEOUT_MS = 15000;
+export const SAVE_TIMEOUT_MS = 12000;
 export const MAX_QTY = 999999;
 export const ENABLE_CONVERSION_QTY = true;
 export const ENABLE_COUNT_ISSUE_CONVERSION = true;

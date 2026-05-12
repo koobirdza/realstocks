@@ -1,5 +1,6 @@
-import { CACHE_TTL, GOOGLE_SCRIPT_URL } from "./config.v53.9.js";
+import { CACHE_TTL, GOOGLE_SCRIPT_URL, SAVE_TIMEOUT_MS } from "./config.v53.9.js";
 import { getCache, setCache, clearCache } from "./store.v53.9.js";
+import { idbGet, idbSet, idbClearByPrefix } from "./idb.v53.9.js";
 
 function buildUrl(action, params = {}) {
   if (!GOOGLE_SCRIPT_URL) throw new Error("Missing RealStock API URL");
@@ -53,7 +54,13 @@ async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 30000) {
 export async function getJson(action, params = {}, cacheName = "", ttlMs = 0, timeoutMs = 30000) {
   if (cacheName && ttlMs > 0) {
     const hit = getCache(cacheName);
-    if (hit?.value) return hit.value;
+    if (hit?.value) return { ...hit.value, localCache: "memory" };
+
+    const idbHit = await idbGet(cacheName);
+    if (idbHit?.ok) {
+      setCache(cacheName, idbHit, Math.min(ttlMs, 5 * 60 * 1000));
+      return { ...idbHit, localCache: "indexeddb" };
+    }
   }
 
   const json = await fetchJsonWithTimeout(
@@ -66,13 +73,14 @@ export async function getJson(action, params = {}, cacheName = "", ttlMs = 0, ti
   );
 
   if (cacheName && ttlMs > 0 && json?.ok) {
-    setCache(cacheName, json, ttlMs);
+    setCache(cacheName, json, Math.min(ttlMs, 5 * 60 * 1000));
+    idbSet(cacheName, json, ttlMs);
   }
 
   return json;
 }
 
-export function clearDataCaches() {
+export function clearDataCaches(options = {}) {
   clearCache("bootstrap.");
   clearCache("catalog.");
   clearCache("stock.");
@@ -80,6 +88,12 @@ export function clearDataCaches() {
   clearCache("diag.");
   clearCache("queue.");
   clearCache("snapshot.");
+
+  // Keep durable IndexedDB cache during normal save, so UI can stay fast.
+  // Use clearDataCaches({ indexedDB: true }) only after admin/nightly rebuild.
+  if (options.indexedDB === true) {
+    ["bootstrap.", "catalog.", "stock.", "order.", "snapshot."].forEach((prefix) => idbClearByPrefix(prefix));
+  }
 }
 
 export const health = () => getJson("health");
@@ -126,6 +140,9 @@ export const adminProcessQueue = (rebuild = false) =>
 
 export const adminInstallQueueTrigger = () =>
   getJson("adminInstallQueueTrigger", { admin: 1 });
+
+export const adminInstallNightlyTrigger = () =>
+  getJson("adminInstallNightlyTrigger", { admin: 1 });
 
 export const queueStatus = () =>
   getJson("queueStatus", {}, "queue.status", 5000);
@@ -207,22 +224,10 @@ function normalizeRowsForQueue(action, rows) {
   });
 }
 
-function runBackgroundQueueAndSnapshot() {
-  fetch(
-    buildUrl("adminProcessQueue", {
-      admin: 1,
-      limit: 1,
-      rebuild: 1,
-      snapshot: 1
-    }),
-    {
-      method: "GET",
-      cache: "no-store"
-    }
-  )
-    .catch((err) => {
-      console.warn("background queue/snapshot process failed", err);
-    });
+function markViewsDirty() {
+  try {
+    localStorage.setItem("realstock.v51.viewsDirty", JSON.stringify({ dirtyAt: Date.now() }));
+  } catch (err) {}
 }
 
 export async function submitAction(action, requestId, rows) {
@@ -247,7 +252,7 @@ export async function submitAction(action, requestId, rows) {
     requestId,
     rows: normalizeRowsForQueue(action, rows),
     queue: true,
-    clientVersion: "v54.2.0-fast-save-nightly-snapshot"
+    clientVersion: "v51.0.0-fast-save-nightly-idb"
   };
 
   try {
@@ -259,7 +264,7 @@ export async function submitAction(action, requestId, rows) {
         cache: "no-store",
         body: JSON.stringify(payload)
       },
-      30000
+      SAVE_TIMEOUT_MS
     );
 
     if (!saveJson?.ok) {
@@ -272,16 +277,18 @@ export async function submitAction(action, requestId, rows) {
       };
     }
 
-    clearDataCaches();
-
-    runBackgroundQueueAndSnapshot();
+    // Do not rebuild/refresh Snapshot here. Heavy compute is reserved for nightly 22:00.
+    // Keep IndexedDB cache available and mark views dirty for later refresh.
+    clearCache("diag.");
+    clearCache("queue.");
+    markViewsDirty();
 
     return {
       ...saveJson,
       queued: true,
       processed: false,
       background: true,
-      message: saveJson.message || "บันทึกเข้าคิวแล้ว ระบบกำลังประมวลผล"
+      message: saveJson.message || "บันทึกแล้ว • ระบบจะคำนวณ Snapshot รอบ 22:00"
     };
   } catch (err) {
     return {
