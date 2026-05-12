@@ -211,24 +211,15 @@ function runBackgroundQueueAndSnapshot() {
   fetch(
     buildUrl("adminProcessQueue", {
       admin: 1,
-      limit: 1
+      limit: 1,
+      rebuild: 1,
+      snapshot: 1
     }),
     {
       method: "GET",
       cache: "no-store"
     }
   )
-    .then(() => {
-      return fetch(
-        buildUrl("adminRebuildSnapshot", {
-          admin: 1
-        }),
-        {
-          method: "GET",
-          cache: "no-store"
-        }
-      );
-    })
     .catch((err) => {
       console.warn("background queue/snapshot process failed", err);
     });
@@ -256,7 +247,7 @@ export async function submitAction(action, requestId, rows) {
     requestId,
     rows: normalizeRowsForQueue(action, rows),
     queue: true,
-    clientVersion: "v54.1.0-option-a-background-save"
+    clientVersion: "v54.2.0-fast-save-nightly-snapshot"
   };
 
   try {

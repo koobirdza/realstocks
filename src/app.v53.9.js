@@ -213,14 +213,9 @@ async function handleSave() {
 
     clearDraft();
 
-    try {
-      clearDataCaches();
-      state.bootstrapped = false;
-      state.instantReadyModes = {};
-      await ensureBootstrapLoaded(true);
-    } catch (refreshErr) {
-      console.warn("snapshot refresh after save failed", refreshErr);
-    }
+    // Fast-save patch: do not force reload Snapshot/Bootstrap after every save.
+    // The request is already queued; queue processing + nightly-style snapshot rebuild happens in backend/background.
+    clearDataCaches();
 
     if (state.path.length) state.path.pop();
     render();
