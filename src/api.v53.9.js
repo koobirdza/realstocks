@@ -164,38 +164,74 @@ function normalizeRowsForQueue(action, rows) {
       item_name: row.item_name || row.item_name_th || "",
       item_name_th: row.item_name_th || row.item_name || "",
       brand: row.brand || "",
+
       qty,
       qty_input: qty,
+
       unit:
         row.unit ||
         row.input_unit ||
         row.base_unit ||
         row.purchase_unit ||
         "",
+
       input_unit:
         row.input_unit ||
         row.unit ||
         row.base_unit ||
         row.purchase_unit ||
         "",
+
       base_unit: row.base_unit || "",
       purchase_unit: row.purchase_unit || "",
       conversion_qty: Number(row.conversion_qty || 1),
+
       stock_zone: location,
       location,
       mode_target: row.mode_target || row.mode_target_key || location,
+
       category: row.category || location,
       main_category: row.main_category || "",
       sub_category: row.sub_category || "",
+
       employee: row.employee || "",
       note: row.note || "",
       reason_code: row.reason_code || "",
       allow_negative: row.allow_negative || "",
+
       from_stock_zone: row.from_stock_zone || row.from_location || "",
       to_stock_zone: row.to_stock_zone || row.to_location || "",
+
       action
     };
   });
+}
+
+function runBackgroundQueueAndSnapshot() {
+  fetch(
+    buildUrl("adminProcessQueue", {
+      admin: 1,
+      limit: 1
+    }),
+    {
+      method: "GET",
+      cache: "no-store"
+    }
+  )
+    .then(() => {
+      return fetch(
+        buildUrl("adminRebuildSnapshot", {
+          admin: 1
+        }),
+        {
+          method: "GET",
+          cache: "no-store"
+        }
+      );
+    })
+    .catch((err) => {
+      console.warn("background queue/snapshot process failed", err);
+    });
 }
 
 export async function submitAction(action, requestId, rows) {
@@ -203,16 +239,24 @@ export async function submitAction(action, requestId, rows) {
     return { ok: false, message: "Missing RealStock API URL" };
   }
 
-  if (!action) return { ok: false, message: "missing action" };
-  if (!requestId) return { ok: false, message: "missing requestId" };
-  if (!Array.isArray(rows) || !rows.length) return { ok: false, message: "missing rows" };
+  if (!action) {
+    return { ok: false, message: "missing action" };
+  }
+
+  if (!requestId) {
+    return { ok: false, message: "missing requestId" };
+  }
+
+  if (!Array.isArray(rows) || !rows.length) {
+    return { ok: false, message: "missing rows" };
+  }
 
   const payload = {
     action,
     requestId,
     rows: normalizeRowsForQueue(action, rows),
     queue: true,
-    clientVersion: "v54.1.0-phase2-save-async-compressed"
+    clientVersion: "v54.1.0-option-a-background-save"
   };
 
   try {
@@ -231,60 +275,29 @@ export async function submitAction(action, requestId, rows) {
       return {
         ...saveJson,
         queued: false,
+        processed: false,
+        background: false,
         message: saveJson?.message || "save queue failed"
       };
     }
 
     clearDataCaches();
 
-    const processJson = await fetchJsonWithTimeout(
-      buildUrl("adminProcessQueue", {
-        admin: 1,
-        limit: 1
-      }),
-      {
-        method: "GET",
-        cache: "no-store"
-      },
-      60000
-    );
-
-    if (!processJson?.ok) {
-      console.error("queue process failed", processJson);
-
-      return {
-        ...saveJson,
-        queued: true,
-        processed: false,
-        processError: processJson,
-        message:
-          "บันทึกเข้าคิวแล้ว แต่ประมวลผลคิวยังไม่สำเร็จ กรุณากดประมวลผลอีกครั้ง"
-      };
-    }
-
-    fetch(
-      buildUrl("adminRebuildSnapshot", { admin: 1 }),
-      {
-        method: "GET",
-        cache: "no-store"
-      }
-    ).catch((snapshotErr) => {
-      console.warn("snapshot rebuild failed", snapshotErr);
-    });
-
-    clearDataCaches();
+    runBackgroundQueueAndSnapshot();
 
     return {
       ...saveJson,
       queued: true,
-      processed: true,
-      processResult: processJson,
-      message: saveJson.message || "บันทึกและประมวลผลเรียบร้อยแล้ว"
+      processed: false,
+      background: true,
+      message: saveJson.message || "บันทึกเข้าคิวแล้ว ระบบกำลังประมวลผล"
     };
   } catch (err) {
     return {
       ok: false,
       queued: false,
+      processed: false,
+      background: false,
       message: err?.message || String(err)
     };
   }
